@@ -25,7 +25,7 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' }}
         uses: docker/build-push-action@v6
         with:
-          file: Dockerfile.rust
+          context: ./build.rust
           push: true
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
