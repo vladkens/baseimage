@@ -22,7 +22,7 @@ Rust has a long compile time for multi-arch images. A way to solve this problem 
 ### Usage
 
 ```Dockerfile
-FROM --platform=$BUILDPLATFORM baseimage/rust as chef
+FROM --platform=$BUILDPLATFORM ghcr.io/vladkens/baseimage/rust:latest as chef
 
 FROM chef AS planner
 COPY Cargo.toml Cargo.lock .

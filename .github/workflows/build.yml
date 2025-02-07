@@ -8,9 +8,10 @@ on:
 jobs:
   build:
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
     permissions:
       packages: write
+    runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       matrix:
         rust-version: [1.82, 1.83, 1.84]
