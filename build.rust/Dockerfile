@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.82
+ARG RUST_VERSION=1.84
 
 FROM rust:${RUST_VERSION}-alpine AS chef
 LABEL org.opencontainers.image.source="https://github.com/vladkens/baseimage"
