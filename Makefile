@@ -1,7 +1,7 @@
 .PHONY: build clean
 
 tag=baseimage/rust
-ver=1.84
+ver=1.94
 
 build:
 	docker build --build-arg RUST_VERSION=$(ver) -t $(tag):$(ver) -f build.rust/Dockerfile build.rust

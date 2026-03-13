@@ -1,45 +1,53 @@
-# baseimage [![Actions](https://github.com/vladkens/baseimage/workflows/build/badge.svg)](https://github.com/vladkens/baseimage/actions)
+# baseimage [![Build](https://github.com/vladkens/baseimage/workflows/build/badge.svg)](https://github.com/vladkens/baseimage/actions)
 
-Docker base images, inspired by [umputun/baseimage](https://github.com/umputun/baseimage).
+Docker base image that compiles Rust binaries for `amd64` and `arm64` natively — no QEMU, no emulation slowdowns.
 
-## Rust Build Image
+- **~5× faster builds.** Compiles on the native CPU via `cargo-zigbuild` instead of emulating the target arch with QEMU.
+- **Saves 3–4 min of CI time.** Drop it into a multi-stage Dockerfile and cross-compilation is already configured.
+- **Both targets, zero setup.** Pre-installed toolchains for `x86_64-unknown-linux-musl` and `aarch64-unknown-linux-musl`, `cargo-chef`, `cargo-zigbuild`, `openssl-dev`.
+- **Layer caching built in.** `cargo-chef` splits dependency compilation from your own code, so deps are only rebuilt when `Cargo.lock` changes.
+- **Static musl binaries.** Outputs are ready to drop into `FROM scratch` or any minimal runtime image.
 
-Rust has a long compile time for multi-arch images. A way to solve this problem was described in [this article](https://vnotes.pages.dev/fast-multi-arch-docker-for-rust/). Briefly, this image prepares cross-compilation flow to perform compilation on native CPU architecture rather than using QEMU, which dramatically increases building speed (~5x). Suitable for building web apps with multi-stage builds. Using this layer can reduce CI time by 3-4 min compare to manual cross-compilation setup.
+Inspired by [umputun/baseimage](https://github.com/umputun/baseimage). Unlike a manual cross-compilation setup, this image wraps the full `cargo-chef` workflow into three commands so you don't repeat the boilerplate in every project.
 
-- Image based on [rust:alpine](https://hub.docker.com/_/rust/)
-- Pre-installed `cargo-chef`, `cargo-zigbuild`, `openssl-dev`
-- Toolchains for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`
-- [`/scripts/build`](./build.rust/build.sh) command to reduce cargo-chef routine
+## Install
 
-`/scripts/build` has three commands:
+```
+ghcr.io/vladkens/baseimage/rust:latest   # latest stable Rust
+ghcr.io/vladkens/baseimage/rust:1.94     # pinned version
+```
 
-- `prepare [recipe_file]` – Prepares recipe file (dependencies tree)
-- `cook [recipe_file]` – Installs and compiles dependencies
-- `final <bin_name>` – Builds actual binary file
+Rebuilt weekly. Available versions: `1.92`, `1.93`, `1.94`.
 
-`final` command will copy binaries to `/out/<bin_name>/linux/{amd64,arm64}`, making it easier to copy binary during runtime stage using `TARGETPLATFORM` argument.
+## Usage
 
-### Usage
-
-```Dockerfile
-FROM --platform=$BUILDPLATFORM ghcr.io/vladkens/baseimage/rust:latest as chef
+```dockerfile
+FROM --platform=$BUILDPLATFORM ghcr.io/vladkens/baseimage/rust:latest AS chef
 
 FROM chef AS planner
 COPY Cargo.toml Cargo.lock .
-RUN /scripts/build prepare
+RUN /scripts/build prepare          # → recipe.json
 
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
-RUN /scripts/build cook
+RUN /scripts/build cook             # compiles deps for both targets
 COPY . .
-RUN /scripts/build final my-app
+RUN /scripts/build final my-app     # → /out/my-app/linux/{amd64,arm64}
 
-# actual docker image, can use any baseimage
 FROM alpine:latest AS runtime
 WORKDIR /app
 ARG TARGETPLATFORM
 COPY --from=builder /out/my-app/${TARGETPLATFORM} /app/my-app
-
 EXPOSE 8080
 CMD ["/app/my-app"]
 ```
+
+### `/scripts/build` commands
+
+| Command | What it does |
+|---|---|
+| `prepare [recipe_file]` | Runs `cargo chef prepare` — snapshots the dependency tree into `recipe.json` |
+| `cook [recipe_file]` | Runs `cargo chef cook` — compiles all deps for both musl targets |
+| `final <bin_name>` | Builds the binary and copies it to `/out/<bin_name>/linux/amd64` and `/out/<bin_name>/linux/arm64` |
+
+The `final` output layout matches Docker's `$TARGETPLATFORM` variable, so copying the right binary in the runtime stage is a one-liner.
